@@ -169,6 +169,33 @@ def combine_and_interpolate(dataframes, target_times):
 
     return interpolated
 
+def resample_acoustic(data, target_index, dt='1min'):
+    """
+    resample acoustic data into magnitude vs time onto a specific target grid
+    """
+    
+    magnitude = pd.Series(0.0, index=target_index)
+    for _, event in data.iterrows():
+        t1 = event['Acoustic t1']
+        t2 = event['Acoustic t2']
+        
+        value = event['Magnitude'] # can change this line to redefine "eruption activity"
+
+        affected_bins = target_index[(target_index <= t2) & (target_index + pd.Timedelta(dt) >= t1)]
+        
+        for bin_start in affected_bins:
+            bin_end = bin_start + pd.Timedelta(dt)
+            overlap_start = max(t1, bin_start)
+            overlap_end = min(t2, bin_end)
+            overlap_seconds = (overlap_end - overlap_start).total_seconds()
+            
+            if overlap_seconds > 0:
+                fraction = overlap_seconds / bin_duration_seconds # smoothing of the data a bit
+                magnitude[bin_start] += value * fraction
+
+    magnitude = magnitude.to_frame(name='Erruption Activity')
+    
+    return magnitude
 
 ##
 ## Load data - to add more data to the pipeline, add it here!
@@ -180,18 +207,17 @@ date_range = pd.to_datetime(["2025-01-22 0:0:0.0", "2025-03-16 00:00:00.0"], utc
 acoustic = pd.read_csv(dpath+'Poas_discrete_2025-01-22_2025-03-15.csv', header=1, names=['Event ID', 'Label', 'Station', 'Sensor Type','Acoustic t1', 'Acoustic t2', 'Energy' ,'Duration', 'Magnitude'])
 acoustic['Acoustic t1'] = pd.to_datetime(acoustic['Acoustic t1'],utc=True)
 acoustic['Acoustic t2'] = pd.to_datetime(acoustic['Acoustic t2'],utc=True)
-acoustic['Datetime'] = acoustic['Acoustic t1']
+acoustic['Datetime'] = pd.to_datetime((acoustic['Acoustic t1'].astype('int64') + acoustic['Acoustic t2'].astype('int64')) / 2) # mean time
 acoustic = set_datetime(acoustic)
 acoustic.name = 'acoustic'
 
 # load seismic data from Sarah
 seismic_data = []
-for station in ['VPCC']: # add more stations/channels if desired
-    for channel in ['Z']:
-        df = pd.read_csv(dpath+f'{station}{channel}_RSAM_600s_local.csv', header=2, names=['Datetime', f'{station}{channel} RSAM', 'Station', 'Channel'])
-        df = set_datetime(df)
-        df.name = f'{station}{channel}_seismic'
-        seismic_data.append(df)
+for station in ['VPCC', 'VPPC', 'VPNC', 'VPRS']: #
+    df = pd.read_csv(dpath+f'{station}_RSAM_600s_merged.csv', header=2, names=['Datetime', f'{station} RSAM', 'Station', 'Channel', 'Year', 'Month'])
+    df = set_datetime(df)
+    df.name = f'{station}_seismic'
+    seismic_data.append(df)
 
 # load magnetic data
 magnetic_data = []
@@ -226,18 +252,16 @@ weather['Datetime'] = [parse_dates(dt) for dt in weather['Datetime']]
 weather = set_datetime(weather)
 weather.name = 'weather'
 
+# define times over which to interpolate (1 minute increments between start and end date)
+target_times = pd.date_range(date_range[0], date_range[1], freq='min')
+
+# interpolate acoustic data
+acoustic_interpolated = resample_acoustic(acoustic, target_times)
+
 # combine and interpolate
-target_times = pd.date_range(date_range[0], date_range[1], freq='min') # times over which to interpolate (1 minute increments between start and end date)
-dataframes = [*seismic_data, *magnetic_data, soilCO2, weather] # all dataframes to combine
+dataframes = [*seismic_data, *magnetic_data, soilCO2, weather, acoustic_interpolated] # all dataframes to combine
 interpolated = combine_and_interpolate(dataframes, target_times)
 interpolated.name = 'dataInterpolated'
-
-# save loaded dataframes as CSV
-for df in dataframes:
-    df.to_csv(processed_dpath+f'{df.name}.csv')
-
-# save acoustic data
-acoustic.to_csv(processed_dpath+f'{acoustic.name}.csv')
 
 # save combined interpolated data as CSV
 interpolated.to_csv(processed_dpath+f'{interpolated.name}.csv')
