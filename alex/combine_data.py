@@ -235,10 +235,6 @@ for station in ['VPRS']:
     df.name = f'{station}_magnetic'
     magnetic_data.append(df)
 
-##
-## combine data and save datasets
-##
-
 # load soil CO2 data
 soilCO2 = pd.read_csv(dpath+'CO2.csv', header=1, names=['Datetime', 'CO2 concentration'])
 soilCO2 = set_datetime(soilCO2)
@@ -251,6 +247,10 @@ weather = pd.concat([df1, df2])
 weather['Datetime'] = [parse_dates(dt) for dt in weather['Datetime']]
 weather = set_datetime(weather)
 weather.name = 'weather'
+
+##
+## combine data and save dataset
+##
 
 # define times over which to interpolate (1 minute increments between start and end date)
 target_times = pd.date_range(date_range[0], date_range[1], freq='min')
