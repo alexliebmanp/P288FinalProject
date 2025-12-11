@@ -2,7 +2,7 @@
 from obspy import Inventory, UTCDateTime, read
 from obspy.clients.fdsn import Client
 date_range = ["2025-01-22", "2025-03-15"] # change if desired
-dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/alex/data/'
+dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/data/'
 
 ##
 ## Function definitions
@@ -130,5 +130,4 @@ def get_magnetic_data(station, dates, network='OV', datapath=dpath):
 ##
 ## Pull magnetic data
 ##
-
 mag_VPRS = get_magnetic_data('VPRS', date_range)

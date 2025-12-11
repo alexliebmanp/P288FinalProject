@@ -4,8 +4,8 @@ import pandas as pd
 from datetime import datetime
 from obspy import Inventory, UTCDateTime, read
 from obspy.clients.fdsn import Client
-dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/alex/data/'
-processed_dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/alex/processed_data/'
+dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/data/'
+processed_dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/processed_data/'
 
 ##
 ## Function definitions
@@ -175,6 +175,7 @@ def resample_acoustic(data, target_index, dt='1min'):
     """
     
     magnitude = pd.Series(0.0, index=target_index)
+    bin_duration_seconds = pd.Timedelta(dt).total_seconds()
     for _, event in data.iterrows():
         t1 = event['Acoustic t1']
         t2 = event['Acoustic t2']
@@ -236,7 +237,7 @@ for station in ['VPRS']:
     magnetic_data.append(df)
 
 # load soil CO2 data
-soilCO2 = pd.read_csv(dpath+'CO2.csv', header=1, names=['Datetime', 'CO2 concentration'])
+soilCO2 = pd.read_csv(dpath+'CO2.csv', header=1, names=['Datetime', 'CO2 Concentration'])
 soilCO2 = set_datetime(soilCO2)
 soilCO2.name = 'soilCO2'
 
