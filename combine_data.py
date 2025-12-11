@@ -216,6 +216,12 @@ acoustic['Datetime'] = pd.to_datetime((acoustic['Acoustic_t1'].astype('int64') +
 acoustic = set_datetime(acoustic)
 acoustic.name = 'acoustic'
 
+lake_data = pd.read_csv(dpath+'lake_pixel_frac_6hourly.csv')
+ld_cols = list(lake_data.columns)
+lake_data = lake_data.rename({ld_cols[0]: 'Datetime', ld_cols[1]: 'lake_size'}, axis=1)
+lake_data = set_datetime(lake_data)
+lake_data.name = 'lake_size'
+
 # load seismic data from Sarah
 seismic_data = []
 for station in ['VPCC', 'VPPC', 'VPNC', 'VPRS']: #
@@ -265,7 +271,7 @@ target_times = pd.date_range(date_range[0], date_range[1], freq='min')
 acoustic_interpolated = resample_acoustic(acoustic, target_times)
 
 # combine and interpolate
-dataframes = [*seismic_data, *magnetic_data, soilCO2, weather, acoustic_interpolated] # all dataframes to combine
+dataframes = [*seismic_data, *magnetic_data, soilCO2, weather, acoustic_interpolated, lake_data] # all dataframes to combine
 interpolated = combine_and_interpolate(dataframes, target_times)
 interpolated.name = 'dataInterpolated'
 
