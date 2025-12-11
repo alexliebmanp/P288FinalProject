@@ -1,11 +1,15 @@
+# %% 
+
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from datetime import datetime
 from obspy import Inventory, UTCDateTime, read
 from obspy.clients.fdsn import Client
-dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/data/'
-processed_dpath = '/Users/oxide/Documents/research/orenstein/code/P288FinalProject/processed_data/'
+dpath = 'data/'
+processed_dpath = 'processed_data/'
+
+# %% 
 
 ##
 ## Function definitions
@@ -101,7 +105,7 @@ def parse_dates(date_string):
     formats = [
         "%Y-%m-%d %H:%M:%S.%f",       # Format 1
         "%Y-%m-%d_%H%M%S",            # Format 2
-        "%Y-%m-%d %H:%M:%S"         # Format 3
+        "%Y-%m-%d %H:%M:%S"           # Format 3
     ]
     
     for fmt in formats:
@@ -177,8 +181,8 @@ def resample_acoustic(data, target_index, dt='1min'):
     magnitude = pd.Series(0.0, index=target_index)
     bin_duration_seconds = pd.Timedelta(dt).total_seconds()
     for _, event in data.iterrows():
-        t1 = event['Acoustic t1']
-        t2 = event['Acoustic t2']
+        t1 = event['Acoustic_t1']
+        t2 = event['Acoustic_t2']
         
         value = event['Magnitude'] # can change this line to redefine "eruption activity"
 
@@ -194,7 +198,7 @@ def resample_acoustic(data, target_index, dt='1min'):
                 fraction = overlap_seconds / bin_duration_seconds # smoothing of the data a bit
                 magnitude[bin_start] += value * fraction
 
-    magnitude = magnitude.to_frame(name='Erruption Activity')
+    magnitude = magnitude.to_frame(name='Eruption_Activity')
     
     return magnitude
 
@@ -202,21 +206,22 @@ def resample_acoustic(data, target_index, dt='1min'):
 ## Load data - to add more data to the pipeline, add it here!
 ##
 
-date_range = pd.to_datetime(["2025-01-22 0:0:0.0", "2025-03-16 00:00:00.0"], utc=True)
+date_range = pd.to_datetime(["2024-01-31 0:0:0.0", "2025-12-01 00:00:00.0"], utc=True)
 
 # load POAS acoustic data
-acoustic = pd.read_csv(dpath+'Poas_discrete_2025-01-22_2025-03-15.csv', header=1, names=['Event ID', 'Label', 'Station', 'Sensor Type','Acoustic t1', 'Acoustic t2', 'Energy' ,'Duration', 'Magnitude'])
-acoustic['Acoustic t1'] = pd.to_datetime(acoustic['Acoustic t1'],utc=True)
-acoustic['Acoustic t2'] = pd.to_datetime(acoustic['Acoustic t2'],utc=True)
-acoustic['Datetime'] = pd.to_datetime((acoustic['Acoustic t1'].astype('int64') + acoustic['Acoustic t2'].astype('int64')) / 2) # mean time
+acoustic = pd.read_csv(dpath+'Poas_discrete_2023-01-01_2025-12-12.csv', header=1, names=['Event ID', 'Label', 'Station', 'Sensor Type','Acoustic_t1', 'Acoustic_t2', 'Energy' ,'Duration', 'Magnitude'])
+acoustic['Acoustic_t1'] = pd.to_datetime(acoustic['Acoustic_t1'],utc=True)
+acoustic['Acoustic_t2'] = pd.to_datetime(acoustic['Acoustic_t2'],utc=True)
+acoustic['Datetime'] = pd.to_datetime((acoustic['Acoustic_t1'].astype('int64') + acoustic['Acoustic_t2'].astype('int64')) / 2) # mean time
 acoustic = set_datetime(acoustic)
 acoustic.name = 'acoustic'
 
 # load seismic data from Sarah
 seismic_data = []
 for station in ['VPCC', 'VPPC', 'VPNC', 'VPRS']: #
-    df = pd.read_csv(dpath+f'{station}_RSAM_600s_merged.csv', header=2, names=['Datetime', f'{station} RSAM', 'Station', 'Channel', 'Year', 'Month'])
+    df = pd.read_csv(dpath+f'{station}_RSAM_600s_merged.csv', header=2, names=['Datetime', f'{station}_RSAM', 'Station', 'Channel', 'Year', 'Month'])
     df = set_datetime(df)
+    df = df.drop(columns=['Year', 'Month'])
     df.name = f'{station}_seismic'
     seismic_data.append(df)
 
@@ -237,7 +242,7 @@ for station in ['VPRS']:
     magnetic_data.append(df)
 
 # load soil CO2 data
-soilCO2 = pd.read_csv(dpath+'CO2.csv', header=1, names=['Datetime', 'CO2 Concentration'])
+soilCO2 = pd.read_csv(dpath+'CO2.csv', header=1, names=['Datetime', 'CO2_ppm'])
 soilCO2 = set_datetime(soilCO2)
 soilCO2.name = 'soilCO2'
 
@@ -266,3 +271,13 @@ interpolated.name = 'dataInterpolated'
 
 # save combined interpolated data as CSV
 interpolated.to_csv(processed_dpath+f'{interpolated.name}.csv')
+
+
+# %%
+
+plt.figure(figsize=(12,8))
+plt.plot(interpolated.index, interpolated.CO2_ppm, label='CO2')
+plt.semilogy(interpolated.index, interpolated["VPCC_RSAM"], label='VPCC_RSAM')
+
+
+# %% 
