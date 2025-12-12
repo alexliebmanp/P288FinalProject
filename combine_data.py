@@ -1,11 +1,11 @@
 # %% 
 
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas as pd
 from datetime import datetime
-from obspy import Inventory, UTCDateTime, read
-from obspy.clients.fdsn import Client
+from obspy import read
+
+import matplotlib.pyplot as plt
 dpath = 'data/'
 processed_dpath = 'processed_data/'
 
@@ -216,6 +216,12 @@ acoustic['Datetime'] = pd.to_datetime((acoustic['Acoustic_t1'].astype('int64') +
 acoustic = set_datetime(acoustic)
 acoustic.name = 'acoustic'
 
+lake_data = pd.read_csv(dpath+'lake_pixel_frac_6hourly.csv')
+ld_cols = list(lake_data.columns)
+lake_data = lake_data.rename({ld_cols[0]: 'Datetime', ld_cols[1]: 'lake_size'}, axis=1)
+lake_data = set_datetime(lake_data)
+lake_data.name = 'lake_size'
+
 # load seismic data from Sarah
 seismic_data = []
 for station in ['VPCC', 'VPPC', 'VPNC', 'VPRS']: #
@@ -227,15 +233,15 @@ for station in ['VPCC', 'VPPC', 'VPNC', 'VPRS']: #
 
 # load magnetic data
 magnetic_data = []
-for station in ['VPRS']:
-    traceE = read(dpath+f'OV.{station}_LFE.m')[0]
-    traceN = read(dpath+f'OV.{station}_LFN.m')[0]
-    traceZ = read(dpath+f'OV.{station}_LFZ.m')[0]
+for station in ['VPRS', 'VPPC', 'VPNC']:
+    traceE = read(dpath+f'{station}_LFE_D_merged.mseed')[0]
+    traceN = read(dpath+f'{station}_LFN_D_merged.mseed')[0]
+    traceZ = read(dpath+f'{station}_LFZ_D_merged.mseed')[0]
     timeseriesE = np.array(traceE)
     timeseriesN = np.array(traceN)
     timeseriesZ = np.array(traceZ)
     times = np.array([t.datetime for t in traceE.times(type='utcdatetime')])
-    column_names = ['Datetime', f'{station} Field E', f'{station} Field N', f'{station} Field Z']
+    column_names = ['Datetime', f'{station}_LFE', f'{station}_LFN', f'{station}_LFZ']
     df = pd.DataFrame(zip(times, timeseriesE, timeseriesN, timeseriesZ), columns=column_names)
     df = set_datetime(df)
     df.name = f'{station}_magnetic'
@@ -254,6 +260,13 @@ weather['Datetime'] = [parse_dates(dt) for dt in weather['Datetime']]
 weather = set_datetime(weather)
 weather.name = 'weather'
 
+# load lake data 
+lake_data = pd.read_csv(dpath+'lake_pixel_frac_6hourly.csv')
+ld_cols = list(lake_data.columns)
+lake_data = lake_data.rename({ld_cols[0]: 'Datetime', ld_cols[1]: 'lake_size'}, axis=1)
+lake_data = set_datetime(lake_data)
+lake_data.name = 'lake_size'
+
 ##
 ## combine data and save dataset
 ##
@@ -265,19 +278,12 @@ target_times = pd.date_range(date_range[0], date_range[1], freq='min')
 acoustic_interpolated = resample_acoustic(acoustic, target_times)
 
 # combine and interpolate
-dataframes = [*seismic_data, *magnetic_data, soilCO2, weather, acoustic_interpolated] # all dataframes to combine
+dataframes = [*seismic_data, *magnetic_data, soilCO2, weather, acoustic_interpolated, lake_data] # all dataframes to combine
 interpolated = combine_and_interpolate(dataframes, target_times)
 interpolated.name = 'dataInterpolated'
 
 # save combined interpolated data as CSV
 interpolated.to_csv(processed_dpath+f'{interpolated.name}.csv')
-
-
-# %%
-
-plt.figure(figsize=(12,8))
-plt.plot(interpolated.index, interpolated.CO2_ppm, label='CO2')
-plt.semilogy(interpolated.index, interpolated["VPCC_RSAM"], label='VPCC_RSAM')
 
 
 # %% 
