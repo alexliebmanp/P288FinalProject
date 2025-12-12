@@ -216,6 +216,12 @@ acoustic['Datetime'] = pd.to_datetime((acoustic['Acoustic_t1'].astype('int64') +
 acoustic = set_datetime(acoustic)
 acoustic.name = 'acoustic'
 
+lake_data = pd.read_csv(dpath+'lake_pixel_frac_6hourly.csv')
+ld_cols = list(lake_data.columns)
+lake_data = lake_data.rename({ld_cols[0]: 'Datetime', ld_cols[1]: 'lake_size'}, axis=1)
+lake_data = set_datetime(lake_data)
+lake_data.name = 'lake_size'
+
 # load seismic data from Sarah
 seismic_data = []
 for station in ['VPCC', 'VPPC', 'VPNC', 'VPRS']: #
