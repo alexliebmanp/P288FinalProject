@@ -2,3 +2,16 @@
 .DS_Store
 __pycache__
 *.icloud
+data/Poas_discrete_2023-01-01_2025-12-12.csv
+data/Poas_counts_2023-01-01_2025-12-12.csv
+data/VPNC_LFE_D_merged.mseed
+data/VPNC_LFN_D_merged.mseed
+data/VPNC_LFZ_D_merged.mseed
+data/VPRS_LFE_D_merged.mseed
+data/VPRS_LFN_D_merged.mseed
+data/VPRS_LFZ_D_merged.mseed
+data/VPPC_LFE_D_merged.mseed
+data/VPPC_LFN_D_merged.mseed
+data/VPPC_LFZ_D_merged.mseed
+data/lake_pixel_frac_6hourly.csv
+processed_data/dataInterpolated.csv
