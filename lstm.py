@@ -76,7 +76,8 @@ class AVERT_LSTM():
         
         # reframe as learning problem
         X, Y = self.PrepareData(data, n_past, n_future)
-        n_divide = round(len(data[:,0])*n_divide)
+        n_times = X.shape[0]
+        n_divide = round((n_times)*n_divide)
         train_X, train_Y = X[:n_divide], Y[:n_divide]
         test_X, test_Y = X[n_divide:], Y[n_divide:]
 
