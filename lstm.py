@@ -12,7 +12,12 @@ import math
 
 class AVERT_LSTM():
     """
-    LSTM class for many-to-many forecasting of volcanic activity. Currently predicts all variables.
+    LSTM class for many-to-many forecasting of volcanic activity.
+
+    Input data: Time-serires data in a Pandas DataFrame with Datetime index and n_features.
+
+    Forecasting task: Predict all n_features for n_future steps given n_past steps.
+
     """
 
     def __init__(self, df, lstm_vars =['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPRS_LFE',
