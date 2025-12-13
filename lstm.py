@@ -20,9 +20,7 @@ class AVERT_LSTM():
 
     """
 
-    def __init__(self, df, lstm_vars =['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPRS_LFE',
-       'VPRS_LFN', 'VPRS_LFZ', 'VPPC_LFE', 'VPPC_LFN', 'VPPC_LFZ', 'VPNC_LFE',
-       'VPNC_LFN', 'VPNC_LFZ', 'CO2_ppm', 'lake_size']):
+    def __init__(self, df, lstm_vars =['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPNC_Intensity', 'CO2_ppm', 'lake_size']):
         """
 
         Load data and preprocess by normalizing and scaling.
@@ -174,7 +172,7 @@ class AVERT_LSTM():
         """
 
         if dfs is None:
-            s = [self.df]
+            dfs = [self.df]
         if isinstance(dfs, pd.DataFrame):
             dfs = [dfs]
         columns = dfs[0].columns
