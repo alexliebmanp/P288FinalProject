@@ -14,7 +14,7 @@ class AVERT_LSTM():
     """
     LSTM class for many-to-many forecasting of volcanic activity.
 
-    Input data: Time-serires data in a Pandas DataFrame with Datetime index and n_features.
+    Input data: Time-serires data in a Pandas DataFrame with Datetime (if not Datetime indexed, tries to make it so) index and n_features.
 
     Forecasting task: Predict all n_features for n_future steps given n_past steps.
 
@@ -31,6 +31,7 @@ class AVERT_LSTM():
         """
 
         # filter data to columns we want in LSTM and handle any nans
+        df.index = pd.to_datetime(df.index) # make sure index is datatime
         df = df[lstm_vars]
         df.fillna(0, inplace=True)
         self.df = df # save DataFrame
@@ -183,19 +184,9 @@ class AVERT_LSTM():
         for df in dfs:
             for ii, c in enumerate(columns):
                 df[c].plot(ax=ax[ii])
-                ax[ii].set(ylabel=c, xlabel='Time')
+                ax[ii].set(ylabel=c)
                 if c in log_vars:
                     ax[ii].set_yscale('log')
-                
-                # Format x-axis for proper DateTime display
-                ax[ii].xaxis.set_major_locator(plt.MaxNLocator(nbins=6))  # Limit number of ticks
-                ax[ii].tick_params(axis='x', rotation=45)  # Rotate labels for readability
-                
-                # If the index is datetime, use date formatting
-                if pd.api.types.is_datetime64_any_dtype(df.index):
-                    import matplotlib.dates as mdates
-                    ax[ii].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-                    ax[ii].xaxis.set_major_locator(mdates.AutoDateLocator())
 
         fig.tight_layout(pad=10)
         plt.show()
