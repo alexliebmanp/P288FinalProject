@@ -7,7 +7,7 @@ from datetime import datetime
 import math
 processed_dpath = 'processed_data/'
 
-# save combined interpolated data as CSV
+# load combined interpolated data as CSV
 interpolated = pd.read_csv(processed_dpath+f'dataInterpolated.csv', index_col=0)
 
 vars = []
