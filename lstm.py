@@ -4,10 +4,13 @@ import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error
+from sklearn.utils.class_weight import compute_class_weight
 from keras import optimizers
 from keras.layers import LSTM
 from keras.layers import Dense, Reshape
 from keras.models import Sequential
+import keras.ops as ops
+import keras
 import math
 from math import sqrt
 
@@ -48,7 +51,7 @@ class AVERT_LSTM():
         self.y_data = self.df_y_scaled.to_numpy()
         self.index = df_x.index
 
-    def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh', task_type='regression'):
+    def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh', task_type='regression', binloss='weighted'):
         """
 
         Creates many-to-many LSTM model by reframing time-series data as supervised learning X and Y data with shapes
@@ -75,6 +78,7 @@ class AVERT_LSTM():
             - opt:              optimization routine
             - activation:       activation function in LSTM layer. No activation is implemented in Dense layer.
             - task_type:        regression or binary (for binary classification)
+            - binloss:          use unweighted, weighted, or focal loss for binary classification
         """
         
         #calling normalized and scaled data
@@ -112,8 +116,15 @@ class AVERT_LSTM():
         if opt == 'adam':
             Opt = optimizers.Adam(learning_rate = learning_rate)
         if task_type == 'binary':
-            loss = 'binary_crossentropy'
-            metrics = ['accuracy', 'binary_accuracy']
+            if binloss=='unweighted':
+                loss = 'binary_crossentropy'
+                metrics = ['accuracy', 'binary_accuracy']
+            if binloss=='weighted':
+                loss = self.GetWeightedBinaryCrossentropy(train_Y)
+                metrics = ['accuracy', keras.metrics.Precision(), keras.metrics.Recall()]
+            if binloss=='focal'
+                loss = self.FocalLoss(gamma=2.0, alpha=0.75)
+                metrics=['accuracy', keras.metrics.Precision(), keras.metrics.Recall()]
         else:
             loss = 'mae'  # or 'mse' for regression
             metrics = ['mae', 'mse']
@@ -291,3 +302,46 @@ class AVERT_LSTM():
         df[:] = unscaled
 
         return df
+
+    def GetWeightedBinaryCrossentropy(self, train_Y):
+        """Create weighted binary crossentropy loss based on class distribution."""
+        Y_flat = train_Y.flatten()
+        n_class_0 = np.sum(Y_flat == 0)
+        n_class_1 = np.sum(Y_flat == 1)
+        
+        # Calculate weight for positive class
+        pos_weight = n_class_0 / n_class_1 if n_class_1 > 0 else 1.0
+        
+        print(f"Positive class weight: {pos_weight:.2f}")
+        
+        def weighted_loss(y_true, y_pred):
+            # Use keras.ops instead of K
+            y_pred = ops.clip(y_pred, 1e-7, 1 - 1e-7)
+            
+            # Weighted binary crossentropy
+            loss = -(pos_weight * y_true * ops.log(y_pred) + 
+                    (1 - y_true) * ops.log(1 - y_pred))
+            
+            return ops.mean(loss)
+        
+        return weighted_loss
+  
+    def FocalLoss(self, gamma=2.0, alpha=0.25):
+        """
+        Focal loss for binary classification.
+        
+        gamma: focusing parameter (higher = more focus on hard examples)
+        alpha: balance parameter (higher = more weight on positive class)
+        """
+        def loss_function(y_true, y_pred):
+            y_true = ops.cast(y_true, 'float32')
+            y_pred = ops.clip(y_pred, 1e-7, 1 - 1e-7)
+            
+            # Calculate focal loss
+            pt_1 = ops.power(1 - y_pred, gamma) * ops.log(y_pred)
+            pt_0 = ops.power(y_pred, gamma) * ops.log(1 - y_pred)
+            
+            loss = -ops.mean(alpha * y_true * pt_1 + (1 - alpha) * (1 - y_true) * pt_0)
+            return loss
+        
+        return loss_function
