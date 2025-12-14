@@ -21,19 +21,20 @@ class AVERT_LSTM():
 
     """
 
-    def __init__(self, df, lstm_vars=['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPNC_Intensity', 'CO2_ppm', 'lake_size']):
+    def __init__(self, df, input_vars=['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPNC_Intensity', 'CO2_ppm', 'lake_size'], predict_vars=['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPNC_Intensity', 'CO2_ppm', 'lake_size']):
         """
 
         Load data and preprocess by normalizing and scaling.
 
         args:
-            - df:           (DataFrame) contains time-series data with Datetime index
-            - lstm_vars:    (list) names of columns in df to use in LSTM
+            - df:               (DataFrame) contains time-series data with Datetime index
+            - input_vars:       (list) names of columns in df to use as input to LSTM
+            - predict_vars:     (list) names of columns in df to predict using LSTM. Must be a subset of input vars.
         """
 
         # filter data to columns we want in LSTM and handle any nans
         df.index = pd.to_datetime(df.index) # make sure index is datatime
-        df = df[lstm_vars]
+        df = df[input_vars]
         df.fillna(0, inplace=True)
         self.df = df # save DataFrame
         
