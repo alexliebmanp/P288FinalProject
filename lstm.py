@@ -122,7 +122,7 @@ class AVERT_LSTM():
             if binloss=='weighted':
                 loss = self.GetWeightedBinaryCrossentropy(train_Y)
                 metrics = ['accuracy', keras.metrics.Precision(), keras.metrics.Recall()]
-            if binloss=='focal'
+            if binloss=='focal':
                 loss = self.FocalLoss(gamma=2.0, alpha=0.75)
                 metrics=['accuracy', keras.metrics.Precision(), keras.metrics.Recall()]
         else:
