@@ -29,27 +29,32 @@ class AVERT_LSTM():
         args:
             - df:               (DataFrame) contains time-series data with Datetime index
             - input_vars:       (list) names of columns in df to use as input to LSTM
-            - predict_vars:     (list) names of columns in df to predict using LSTM. Must be a subset of input vars.
+            - predict_vars:     (list) names of columns in df to predict using LSTM.
         """
 
         # filter data to columns we want in LSTM and handle any nans
         df.index = pd.to_datetime(df.index) # make sure index is datatime
-        df = df[input_vars]
         df.fillna(0, inplace=True)
-        self.df = df # save DataFrame
+        df_x = df[input_vars]
+        df_y = df[predict_vars]
+        self.df_x = df_x # save input DataFrame
+        self.df_y = df_y # save predict DataFrame
+        self.df = df[list(set(input_vars+predict_vars))] # combined DataFrame
         
-        # preprocess data into numpy arrays
-        self.df_scaled, self.scaler = self.NormAndScale(df)
-        self.data = self.df_scaled.to_numpy()
-        self.index = self.df.index
+        # preprocess data into both dataframes and numpy arrays
+        self.df_x_scaled, self.x_scaler = self.NormAndScale(df_x)
+        self.df_y_scaled, self.y_scaler = self.NormAndScale(df_y)
+        self.x_data = self.df_x_scaled.to_numpy()
+        self.y_data = self.df_y_scaled.to_numpy()
+        self.index = df_x.index
 
     def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh'):
         """
 
         Creates many-to-many LSTM model by reframing time-series data as supervised learning X and Y data with shapes
 
-        X.shape = (n_times, n_past, n_features)
-        Y.shape = (n_times, n_future, n_features)
+        X.shape = (n_times, n_past, nx_features)
+        Y.shape = (n_times, n_future, ny_features)
 
         where n_features is the number of columns in df. It then defines a model with the following architecture
 
@@ -72,12 +77,16 @@ class AVERT_LSTM():
         """
         
         #calling normalized and scaled data
-        data = self.data
-        n_features = data.shape[1]
-        self.n_features = n_features
+        x_data = self.x_data
+        y_data = self.y_data
+        nx_features = x_data.shape[1]
+        ny_features = y_data.shape[1]
+        self.nx_features = nx_features
+        self.ny_features = ny_features
         
         # reframe as learning problem
-        X, Y = self.PrepareData(data, n_past, n_future)
+        X, _ = self.PrepareData(x_data, n_past, n_future)
+        _, Y = self.PrepareData(y_data, n_past, n_future)
         n_times = X.shape[0]
         n_divide = round((n_times)*n_divide)
         train_X, train_Y = X[:n_divide], Y[:n_divide]
@@ -89,9 +98,9 @@ class AVERT_LSTM():
  
         #design network: n_neurons stands for size of hidden layer
         model = Sequential()
-        model.add(LSTM(n_neurons, input_shape=(n_past, n_features), activation=activation))
-        model.add(Dense(n_future * n_features))
-        model.add(Reshape((n_future, n_features)))
+        model.add(LSTM(n_neurons, input_shape=(n_past, nx_features), activation=activation))
+        model.add(Dense(n_future * ny_features))
+        model.add(Reshape((n_future, ny_features)))
         if opt == 'sgd':
             Opt = optimizers.SGD(learning_rate = learning_rate,\
                                  momentum = momentum)
@@ -149,11 +158,11 @@ class AVERT_LSTM():
         self.Yhat = Yhat
         back = Yhat.shape[0]
         Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
-        index = self.df.index[-back:]
-        columns = self.df.columns
+        index = self.index[-back:]
+        columns = self.df_y.columns
         df_scaled = pd.DataFrame(Yhat_last, columns=columns, index=index) # not sure yet how to handle index
-        df = self.invNormAndScale(df_scaled, self.scaler)
-        self.df_pred = df
+        df = self.invNormAndScale(df_scaled, self.y_scaler)
+        self.df_yhat = df
 
         rmse = np.mean(np.sqrt((Yhat-self.test_Y)**2))
         print('Test RMSE: %.3f' % rmse)
@@ -163,7 +172,7 @@ class AVERT_LSTM():
         Macro that predicts forecast on test_X and then plots.
         """
         self.Predict()
-        self.PlotData([self.df, self.df_pred])
+        self.PlotData([self.df_y, self.df_yhat])
 
     ### Helper Functions ###
 
