@@ -9,6 +9,7 @@ from keras.layers import LSTM
 from keras.layers import Dense, Reshape
 from keras.models import Sequential
 import math
+from math import sqrt
 
 class AVERT_LSTM():
     """
@@ -20,7 +21,7 @@ class AVERT_LSTM():
 
     """
 
-    def __init__(self, df, lstm_vars =['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPNC_Intensity', 'CO2_ppm', 'lake_size']):
+    def __init__(self, df, lstm_vars=['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM', 'VPNC_Intensity', 'CO2_ppm', 'lake_size']):
         """
 
         Load data and preprocess by normalizing and scaling.
@@ -125,7 +126,7 @@ class AVERT_LSTM():
 
         # fit network
         print('Performing Training...')
-        history = model.fit(train_X, train_Y, epochs=n_epochs, batch_size =24*14, validation_data=(test_X, test_Y), verbose=2, shuffle=False)
+        history = model.fit(train_X, train_Y, epochs=n_epochs, batch_size=24*14, validation_data=(test_X, test_Y), verbose=2, shuffle=False)
         print('...Training Done!')
 
         #plot history
@@ -144,6 +145,7 @@ class AVERT_LSTM():
         model = self.model
         X = self.test_X
         Yhat = model.predict(X)
+        self.Yhat = Yhat
         back = Yhat.shape[0]
         Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
         index = self.df.index[-back:]
@@ -152,15 +154,15 @@ class AVERT_LSTM():
         df = self.invNormAndScale(df_scaled, self.scaler)
         self.df_pred = df
 
+        rmse = np.mean(np.sqrt((Yhat-self.test_Y)**2))
+        print('Test RMSE: %.3f' % rmse)
+
     def Forecast(self):
         """
         Macro that predicts forecast on test_X and then plots.
         """
-        
         self.Predict()
         self.PlotData([self.df, self.df_pred])
-
-        # plot these two things together using PlotData to see how the prediction fared  
 
     ### Helper Functions ###
 
