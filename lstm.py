@@ -48,7 +48,7 @@ class AVERT_LSTM():
         self.y_data = self.df_y_scaled.to_numpy()
         self.index = df_x.index
 
-    def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh'):
+    def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh', task_type='regression'):
         """
 
         Creates many-to-many LSTM model by reframing time-series data as supervised learning X and Y data with shapes
@@ -74,6 +74,7 @@ class AVERT_LSTM():
             - momentum:         momentum used in gradient descent
             - opt:              optimization routine
             - activation:       activation function in LSTM layer. No activation is implemented in Dense layer.
+            - task_type:        regression or binary (for binary classification)
         """
         
         #calling normalized and scaled data
@@ -99,16 +100,27 @@ class AVERT_LSTM():
         #design network: n_neurons stands for size of hidden layer
         model = Sequential()
         model.add(LSTM(n_neurons, input_shape=(n_past, nx_features), activation=activation))
-        model.add(Dense(n_future * ny_features))
+        if task_type == 'binary':
+            # Binary classification: sigmoid activation
+            model.add(Dense(n_future * ny_features, activation='sigmoid'))
+        else:
+            # Regression: no activation (linear)
+            model.add(Dense(n_future * ny_features))
         model.add(Reshape((n_future, ny_features)))
         if opt == 'sgd':
-            Opt = optimizers.SGD(learning_rate = learning_rate,\
-                                 momentum = momentum)
+            Opt = optimizers.SGD(learning_rate = learning_rate, momentum = momentum)
         if opt == 'adam':
             Opt = optimizers.Adam(learning_rate = learning_rate)
-        model.compile(loss = 'mae', optimizer = Opt)
+        if task_type == 'binary':
+            loss = 'binary_crossentropy'
+            metrics = ['accuracy', 'binary_accuracy']
+        else:
+            loss = 'mae'  # or 'mse' for regression
+            metrics = ['mae', 'mse']
+        model.compile(loss=loss, optimizer=Opt, metrics=metrics)
 
         # store
+        self.task_type = task_type
         self.opt = opt
         self.momentum = momentum
         self.learning_rate = learning_rate
@@ -155,6 +167,8 @@ class AVERT_LSTM():
         model = self.model
         X = self.test_X
         Yhat = model.predict(X)
+        #if self.task_type=='binary':
+        #    Yhat = (Yhat > 0.5).astype(int) 
         self.Yhat = Yhat
         back = Yhat.shape[0]
         Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
