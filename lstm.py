@@ -38,17 +38,28 @@ class AVERT_LSTM():
         # filter data to columns we want in LSTM and handle any nans
         df.index = pd.to_datetime(df.index) # make sure index is datatime
         df.fillna(0, inplace=True)
-        df_x = df[input_vars]
-        df_y = df[predict_vars]
+        df_x = df[input_vars].copy()
+        df_y = df[predict_vars].copy()
+        # if "Eruption_Activity" in df_y.columns:
+        #     df_y["Eruption_Activity"] = (df_y["Eruption_Activity"] > 0).astype(int)
+
         self.df_x = df_x # save input DataFrame
         self.df_y = df_y # save predict DataFrame
         self.df = df[list(set(input_vars+predict_vars))] # combined DataFrame
         
         # preprocess data into both dataframes and numpy arrays
         self.df_x_scaled, self.x_scaler = self.NormAndScale(df_x)
-        self.df_y_scaled, self.y_scaler = self.NormAndScale(df_y)
         self.x_data = self.df_x_scaled.to_numpy()
-        self.y_data = self.df_y_scaled.to_numpy()
+        # self.df_y_scaled, self.y_scaler = self.NormAndScale(df_y)
+        # self.y_data = self.df_y_scaled.to_numpy()
+        if "Label" in df_y.columns or df_y.nunique().iloc[0] <= 2:
+            self.df_y_scaled = df_y.copy()
+            self.y_scaler = None
+            self.y_data = df_y.to_numpy().astype(np.float32)
+        else:
+            self.df_y_scaled, self.y_scaler = self.NormAndScale(df_y)
+            self.y_data = self.df_y_scaled.to_numpy()
+
         self.index = df_x.index
 
     def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh', task_type='regression', binloss='weighted'):
@@ -80,30 +91,69 @@ class AVERT_LSTM():
             - task_type:        regression or binary (for binary classification)
             - binloss:          use unweighted, weighted, or focal loss for binary classification
         """
-        
-        #calling normalized and scaled data
-        x_data = self.x_data
-        y_data = self.y_data
-        nx_features = x_data.shape[1]
-        ny_features = y_data.shape[1]
-        self.nx_features = nx_features
-        self.ny_features = ny_features
-        
-        # reframe as learning problem
-        X, _ = self.PrepareData(x_data, n_past, n_future)
-        _, Y = self.PrepareData(y_data, n_past, n_future)
-        n_times = X.shape[0]
-        n_divide = round((n_times)*n_divide)
-        train_X, train_Y = X[:n_divide], Y[:n_divide]
-        test_X, test_Y = X[n_divide:], Y[n_divide:]
 
-        # keep track of Datetime index across train/test set
-        self.train_index = self.index[:n_divide]
-        self.test_index = self.index[n_divide:]
+        x_raw = self.df_x.to_numpy().astype(np.float32)
+        y_raw = self.df_y.to_numpy().astype(np.float32)
+
+        # make unscaled bits
+        X, _ = self.PrepareData(x_raw, n_past, n_future)
+        _, Y = self.PrepareData(y_raw, n_past, n_future)
+
+        n_times = X.shape[0]
+        n_divide = round(n_times * n_divide)
+        train_X, train_Y = X[:n_divide], Y[:n_divide]
+        test_X,  test_Y  = X[n_divide:], Y[n_divide:]
+
+        # fit x scaler on training data
+        nx_features = train_X.shape[-1]
+        x_scaler = MinMaxScaler((0, 1))
+        x_scaler.fit(train_X.reshape(-1, nx_features))
+        train_X = x_scaler.transform(train_X.reshape(-1, nx_features)).reshape(train_X.shape)
+        test_X  = x_scaler.transform(test_X.reshape(-1, nx_features)).reshape(test_X.shape)
+
+        # fit y scaler on training data
+        ny_features = train_Y.shape[-1]
+        if task_type != "binary":
+            y_scaler = MinMaxScaler((0, 1))
+            y_scaler.fit(train_Y.reshape(-1, ny_features))
+            train_Y = y_scaler.transform(train_Y.reshape(-1, ny_features)).reshape(train_Y.shape)
+            test_Y  = y_scaler.transform(test_Y.reshape(-1, ny_features)).reshape(test_Y.shape)
+        else:
+            y_scaler = None
+
+        # store for Predict()
+        self.x_scaler = x_scaler
+        self.y_scaler = y_scaler
+        self.train_X, self.train_Y = train_X, train_Y
+        self.test_X,  self.test_Y  = test_X,  test_Y
+
+        #calling normalized and scaled data
+        # x_data = self.x_data
+        # y_data = self.y_data
+        # nx_features = x_data.shape[1]
+        # ny_features = y_data.shape[1]
+        # self.nx_features = nx_features
+        # self.ny_features = ny_features
+        
+        # # reframe as learning problem
+        # X, _ = self.PrepareData(x_data, n_past, n_future)
+        # _, Y = self.PrepareData(y_data, n_past, n_future)
+        # n_times = X.shape[0]
+        # n_divide = round((n_times)*n_divide)
+        # train_X, train_Y = X[:n_divide], Y[:n_divide]
+        # test_X, test_Y = X[n_divide:], Y[n_divide:]
+
+        # # keep track of Datetime index across train/test set
+        # offset = n_past + n_future - 1
+        # valid_index = self.index[offset:offset + n_times]
+
+        # self.train_index = valid_index[:n_divide]
+        # self.test_index  = valid_index[n_divide:]
  
-        #design network: n_neurons stands for size of hidden layer
+        # n_neurons for size of hidden layer
         model = Sequential()
         model.add(LSTM(n_neurons, input_shape=(n_past, nx_features), activation=activation))
+
         if task_type == 'binary':
             # Binary classification: sigmoid activation
             model.add(Dense(n_future * ny_features, activation='sigmoid'))
@@ -114,7 +164,7 @@ class AVERT_LSTM():
         if opt == 'sgd':
             Opt = optimizers.SGD(learning_rate = learning_rate, momentum = momentum)
         if opt == 'adam':
-            Opt = optimizers.Adam(learning_rate = learning_rate)
+            Opt = optimizers.Adam(learning_rate = learning_rate, clipnorm=1.0)
         if task_type == 'binary':
             if binloss=='unweighted':
                 loss = 'binary_crossentropy'
@@ -159,38 +209,82 @@ class AVERT_LSTM():
 
         # fit network
         print('Performing Training...')
-        history = model.fit(train_X, train_Y, epochs=n_epochs, batch_size=24*14, validation_data=(test_X, test_Y), verbose=2, shuffle=False)
+        history = model.fit(train_X, train_Y, epochs=n_epochs, batch_size=2**6, validation_data=(test_X, test_Y), verbose=2, shuffle=False)
         print('...Training Done!')
 
         #plot history
         plt.plot(history.history['loss'], label='train')
         plt.plot(history.history['val_loss'], label='test')
         plt.xlabel('epoch')
-        plt.ylabel('loss [MSE]')
+        plt.ylabel('loss [MAE]')
         plt.legend()
         plt.show()
 
-    def Predict(self):
-        """
-        predit Yhat on test_X, unscale, store in a DataFrame self.df_pred. Currently just takes the predictions from max n_future.
-        """
+    # def Predict(self):
+    #     """
+    #     predit Yhat on test_X, unscale, store in a DataFrame self.df_pred. Currently just takes the predictions from max n_future.
+    #     """
 
+    #     model = self.model
+    #     X = self.test_X
+    #     Yhat = model.predict(X)
+    #     #if self.task_type=='binary':
+    #     #    Yhat = (Yhat > 0.5).astype(int) 
+    #     self.Yhat = Yhat
+    #     back = Yhat.shape[0]
+    #     Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
+    #     # index = self.index[-back:]
+    #     index = self.test_index
+    #     columns = self.df_y.columns
+    #     df_scaled = pd.DataFrame(Yhat_last, columns=columns, index=index) # not sure yet how to handle index
+    #     df = self.invNormAndScale(df_scaled, self.y_scaler)
+    #     self.df_yhat = df
+
+    #     rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
+    #     print('Test RMSE: %.3f' % rmse)
+
+    def Predict(self):
         model = self.model
         X = self.test_X
         Yhat = model.predict(X)
-        #if self.task_type=='binary':
-        #    Yhat = (Yhat > 0.5).astype(int) 
-        self.Yhat = Yhat
-        back = Yhat.shape[0]
-        Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
-        index = self.index[-back:]
-        columns = self.df_y.columns
-        df_scaled = pd.DataFrame(Yhat_last, columns=columns, index=index) # not sure yet how to handle index
-        df = self.invNormAndScale(df_scaled, self.y_scaler)
-        self.df_yhat = df
 
-        rmse = np.mean(np.sqrt((Yhat-self.test_Y)**2))
-        print('Test RMSE: %.3f' % rmse)
+        # keep last future step
+        Yhat_last = Yhat[:, -1, :]
+
+        index = self.test_index
+        columns = self.df_y.columns
+
+        if self.task_type == "binary":
+            # probabilities (already in [0, 1])
+            df_prob = pd.DataFrame(
+                Yhat_last,
+                columns=[f"{c}_prob" for c in columns],
+                index=index,
+            )
+
+            # threshold ?
+            df_pred = pd.DataFrame(
+                (Yhat_last > 0.5).astype(int),
+                columns=columns,
+                index=index,
+            )
+
+            self.df_yhat_prob = df_prob
+            self.df_yhat = df_pred
+
+        else:
+            # regression: inverse scale
+            df_scaled = pd.DataFrame(
+                Yhat_last,
+                columns=columns,
+                index=index,
+            )
+            df = self.invNormAndScale(df_scaled, self.y_scaler)
+            self.df_yhat = df
+
+            rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
+            print("Test RMSE: %.3f" % rmse)
+
 
     def Forecast(self):
         """
@@ -201,7 +295,7 @@ class AVERT_LSTM():
 
     ### Helper Functions ###
 
-    def PlotData(self, dfs=None, log_vars=['Eruption_Activity', 'VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM']):
+    def PlotData(self, dfs=None, log_vars=['VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM']):
         """
         Plots data for each DataFrame in dfs:
 
@@ -214,20 +308,36 @@ class AVERT_LSTM():
             dfs = [self.df]
         if isinstance(dfs, pd.DataFrame):
             dfs = [dfs]
+
         columns = dfs[0].columns
+        ncols = len(columns)
         scale = 3
-        fig, ax = plt.subplots(math.ceil(len(columns)/2), 2, figsize=(8*scale, 0.75*scale*len(columns)), constrained_layout=True)
-        ax = ax.flatten()
+
+        if ncols == 1:
+            fig, ax = plt.subplots(
+                1, 1,
+                figsize=(8 * scale, 3 * scale),
+                constrained_layout=True,
+            )
+            ax = [ax]   # iterable, same downstream logic
+
+        else:
+            fig, ax = plt.subplots(
+                math.ceil(ncols / 2), 2,
+                figsize=(8 * scale, 0.75 * scale * ncols),
+                constrained_layout=True,
+            )
+            ax = ax.flatten()
 
         for df in dfs:
             for ii, c in enumerate(columns):
                 df[c].plot(ax=ax[ii])
-                ax[ii].set(ylabel=c)
+                ax[ii].set_ylabel(c)
                 if c in log_vars:
-                    ax[ii].set_yscale('log')
+                    ax[ii].set_yscale("log")
 
-        fig.tight_layout(pad=10)
         plt.show()
+
 
     def PrepareData(self, data, n_past, n_future):
         """
@@ -309,7 +419,7 @@ class AVERT_LSTM():
         n_class_0 = np.sum(Y_flat == 0)
         n_class_1 = np.sum(Y_flat == 1)
         
-        # Calculate weight for positive class
+        # calculate weight for positive class
         pos_weight = n_class_0 / n_class_1 if n_class_1 > 0 else 1.0
         
         print(f"Positive class weight: {pos_weight:.2f}")
