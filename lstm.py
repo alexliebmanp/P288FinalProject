@@ -218,7 +218,7 @@ class AVERT_LSTM():
             # probabilities (already in [0, 1])
             df_prob = pd.DataFrame(
                 Yhat_last,
-                columns=[f"{c}_prob" for c in columns],
+                columns=columns,
                 index=index,
             )
 
