@@ -2,9 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
-from sklearn.preprocessing import LabelEncoder
-from sklearn.metrics import mean_squared_error
-from sklearn.utils.class_weight import compute_class_weight
 from keras import optimizers
 from keras.layers import LSTM
 from keras.layers import Dense, Reshape
@@ -12,7 +9,7 @@ from keras.models import Sequential
 import keras.ops as ops
 import keras
 import math
-from math import sqrt
+
 
 class AVERT_LSTM():
     """
@@ -35,33 +32,19 @@ class AVERT_LSTM():
             - predict_vars:     (list) names of columns in df to predict using LSTM.
         """
 
-        # filter data to columns we want in LSTM and handle any nans
-        df.index = pd.to_datetime(df.index) # make sure index is datatime
-        df.fillna(0, inplace=True)
-        df_x = df[input_vars].copy()
-        df_y = df[predict_vars].copy()
+        df = df.copy()
+        df.index = pd.to_datetime(df.index)
+        df = df.fillna(0)
 
+        self.df_x = df[input_vars].copy()
+        self.df_y = df[predict_vars].copy()
 
-        self.df_x = df_x # save input DataFrame
-        self.df_y = df_y # save predict DataFrame
-        self.df = df[list(set(input_vars+predict_vars))] # combined DataFrame
-        
-        # preprocess data into both dataframes and numpy arrays
-        self.df_x_scaled, self.x_scaler = self.NormAndScale(df_x)
-        self.x_data = self.df_x_scaled.to_numpy()
-        # self.df_y_scaled, self.y_scaler = self.NormAndScale(df_y)
-        # self.y_data = self.df_y_scaled.to_numpy()
-        if "Label" in df_y.columns or df_y.nunique().iloc[0] <= 2:
-            self.df_y_scaled = df_y.copy()
-            self.y_scaler = None
-            self.y_data = df_y.to_numpy().astype(np.float32)
-        else:
-            self.df_y_scaled, self.y_scaler = self.NormAndScale(df_y)
-            self.y_data = self.df_y_scaled.to_numpy()
+        cols = list(dict.fromkeys(input_vars + predict_vars))
+        self.df = df[cols].copy()
 
-        self.index = df_x.index
+        self.index = self.df_x.index        
 
-    def CreateModel(self, n_past=1, n_future=1, n_divide=0.8, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh', task_type='regression', binloss='weighted'):
+    def CreateModel(self, n_past=1, n_future=1, n_divide=0.75, n_neurons=400, n_epochs=150, learning_rate=0.001, momentum=0.4, opt ='adam', activation='tanh', task_type='regression', binloss='weighted'):
         """
 
         Creates many-to-many LSTM model by reframing time-series data as supervised learning X and Y data with shapes
@@ -116,7 +99,7 @@ class AVERT_LSTM():
             y_scaler = MinMaxScaler((0, 1))
             y_scaler.fit(train_Y.reshape(-1, ny_features))
             train_Y = y_scaler.transform(train_Y.reshape(-1, ny_features)).reshape(train_Y.shape)
-            test_Y  = y_scaler.transform(test_Y.reshape(-1, ny_features)).reshape(test_Y.shape)
+            test_Y = y_scaler.transform(test_Y.reshape(-1, ny_features)).reshape(test_Y.shape)
         else:
             y_scaler = None
 
@@ -124,14 +107,30 @@ class AVERT_LSTM():
         self.x_scaler = x_scaler
         self.y_scaler = y_scaler
         self.train_X, self.train_Y = train_X, train_Y
-        self.test_X,  self.test_Y  = test_X,  test_Y
+        self.test_X, self.test_Y  = test_X,  test_Y
+
+        #calling normalized and scaled data
+        # x_data = self.x_data
+        # y_data = self.y_data
+        # nx_features = x_data.shape[1]
+        # ny_features = y_data.shape[1]
+        # self.nx_features = nx_features
+        # self.ny_features = ny_features
+        
+        # # reframe as learning problem
+        # X, _ = self.PrepareData(x_data, n_past, n_future)
+        # _, Y = self.PrepareData(y_data, n_past, n_future)
+        # n_times = X.shape[0]
+        # n_divide = round((n_times)*n_divide)
+        # train_X, train_Y = X[:n_divide], Y[:n_divide]
+        # test_X, test_Y = X[n_divide:], Y[n_divide:]
 
         # # keep track of Datetime index across train/test set
         offset = n_past + n_future - 1
         valid_index = self.index[offset:offset + n_times]
 
         self.train_index = valid_index[:n_divide]
-        self.test_index  = valid_index[n_divide:]
+        self.test_index = valid_index[n_divide:]
  
         # n_neurons for size of hidden layer
         model = Sequential()
@@ -172,9 +171,13 @@ class AVERT_LSTM():
         self.n_past   = n_past
         self.n_future = n_future
         self.model    = model
+        self.test_X   = test_X
+        self.test_Y   = test_Y
+        self.train_X  = train_X
+        self.train_Y  = train_Y
         self.n_divide = n_divide
 
-    def Fit(self, plot=True):
+    def Fit(self, plot=False):
         """
         Fits self.model and plots loss history over train and test sets.
         """
@@ -192,7 +195,7 @@ class AVERT_LSTM():
         print('...Training Done!')
 
         #plot history
-        if plot:
+        if plot: 
             plt.plot(history.history['loss'], label='train')
             plt.plot(history.history['val_loss'], label='test')
             plt.xlabel('epoch')
@@ -200,9 +203,32 @@ class AVERT_LSTM():
             plt.legend()
             plt.show()
 
+    # def Predict(self):
+    #     """
+    #     predit Yhat on test_X, unscale, store in a DataFrame self.df_pred. Currently just takes the predictions from max n_future.
+    #     """
+
+    #     model = self.model
+    #     X = self.test_X
+    #     Yhat = model.predict(X)
+    #     #if self.task_type=='binary':
+    #     #    Yhat = (Yhat > 0.5).astype(int) 
+    #     self.Yhat = Yhat
+    #     back = Yhat.shape[0]
+    #     Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
+    #     # index = self.index[-back:]
+    #     index = self.test_index
+    #     columns = self.df_y.columns
+    #     df_scaled = pd.DataFrame(Yhat_last, columns=columns, index=index) # not sure yet how to handle index
+    #     df = self.invNormAndScale(df_scaled, self.y_scaler)
+    #     self.df_yhat = df
+
+    #     rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
+    #     print('Test RMSE: %.3f' % rmse)
+
     def Predict(self):
         """
-        predit Yhat on test_X, unscale, store in a DataFrame self.df_yhat. Currently just takes the predictions from max n_future.
+        Predict Yhat on test_X, unscale, store in a DataFrame self.df_pred.
         """
         model = self.model
         X = self.test_X
@@ -210,7 +236,6 @@ class AVERT_LSTM():
 
         # keep last future step
         Yhat_last = Yhat[:, -1, :]
-        self.Yhat = Yhat
 
         index = self.test_index
         columns = self.df_y.columns
@@ -219,7 +244,7 @@ class AVERT_LSTM():
             # probabilities (already in [0, 1])
             df_prob = pd.DataFrame(
                 Yhat_last,
-                columns=columns,
+                columns=[f"{c}_prob" for c in columns],
                 index=index,
             )
 
@@ -245,6 +270,7 @@ class AVERT_LSTM():
 
             rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
             print("Test RMSE: %.3f" % rmse)
+
 
     def Forecast(self):
         """
@@ -297,6 +323,7 @@ class AVERT_LSTM():
                     ax[ii].set_yscale("log")
 
         plt.show()
+
 
     def PrepareData(self, data, n_past, n_future):
         """
