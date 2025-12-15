@@ -40,8 +40,7 @@ class AVERT_LSTM():
         df.fillna(0, inplace=True)
         df_x = df[input_vars].copy()
         df_y = df[predict_vars].copy()
-        # if "Eruption_Activity" in df_y.columns:
-        #     df_y["Eruption_Activity"] = (df_y["Eruption_Activity"] > 0).astype(int)
+
 
         self.df_x = df_x # save input DataFrame
         self.df_y = df_y # save predict DataFrame
@@ -127,22 +126,6 @@ class AVERT_LSTM():
         self.train_X, self.train_Y = train_X, train_Y
         self.test_X,  self.test_Y  = test_X,  test_Y
 
-        #calling normalized and scaled data
-        # x_data = self.x_data
-        # y_data = self.y_data
-        # nx_features = x_data.shape[1]
-        # ny_features = y_data.shape[1]
-        # self.nx_features = nx_features
-        # self.ny_features = ny_features
-        
-        # # reframe as learning problem
-        # X, _ = self.PrepareData(x_data, n_past, n_future)
-        # _, Y = self.PrepareData(y_data, n_past, n_future)
-        # n_times = X.shape[0]
-        # n_divide = round((n_times)*n_divide)
-        # train_X, train_Y = X[:n_divide], Y[:n_divide]
-        # test_X, test_Y = X[n_divide:], Y[n_divide:]
-
         # # keep track of Datetime index across train/test set
         offset = n_past + n_future - 1
         valid_index = self.index[offset:offset + n_times]
@@ -189,10 +172,6 @@ class AVERT_LSTM():
         self.n_past   = n_past
         self.n_future = n_future
         self.model    = model
-        self.test_X   = test_X
-        self.test_Y   = test_Y
-        self.train_X  = train_X
-        self.train_Y  = train_Y
         self.n_divide = n_divide
 
     def Fit(self):
@@ -220,30 +199,10 @@ class AVERT_LSTM():
         plt.legend()
         plt.show()
 
-    # def Predict(self):
-    #     """
-    #     predit Yhat on test_X, unscale, store in a DataFrame self.df_pred. Currently just takes the predictions from max n_future.
-    #     """
-
-    #     model = self.model
-    #     X = self.test_X
-    #     Yhat = model.predict(X)
-    #     #if self.task_type=='binary':
-    #     #    Yhat = (Yhat > 0.5).astype(int) 
-    #     self.Yhat = Yhat
-    #     back = Yhat.shape[0]
-    #     Yhat_last = Yhat[:,-1,:] # keep just the last time point predicted for each time
-    #     # index = self.index[-back:]
-    #     index = self.test_index
-    #     columns = self.df_y.columns
-    #     df_scaled = pd.DataFrame(Yhat_last, columns=columns, index=index) # not sure yet how to handle index
-    #     df = self.invNormAndScale(df_scaled, self.y_scaler)
-    #     self.df_yhat = df
-
-    #     rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
-    #     print('Test RMSE: %.3f' % rmse)
-
     def Predict(self):
+        """
+        predit Yhat on test_X, unscale, store in a DataFrame self.df_yhat. Currently just takes the predictions from max n_future.
+        """
         model = self.model
         X = self.test_X
         Yhat = model.predict(X)
@@ -337,7 +296,6 @@ class AVERT_LSTM():
                     ax[ii].set_yscale("log")
 
         plt.show()
-
 
     def PrepareData(self, data, n_past, n_future):
         """
