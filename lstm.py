@@ -144,11 +144,11 @@ class AVERT_LSTM():
         # test_X, test_Y = X[n_divide:], Y[n_divide:]
 
         # # keep track of Datetime index across train/test set
-        # offset = n_past + n_future - 1
-        # valid_index = self.index[offset:offset + n_times]
+        offset = n_past + n_future - 1
+        valid_index = self.index[offset:offset + n_times]
 
-        # self.train_index = valid_index[:n_divide]
-        # self.test_index  = valid_index[n_divide:]
+        self.train_index = valid_index[:n_divide]
+        self.test_index  = valid_index[n_divide:]
  
         # n_neurons for size of hidden layer
         model = Sequential()
