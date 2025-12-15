@@ -174,7 +174,7 @@ class AVERT_LSTM():
         self.model    = model
         self.n_divide = n_divide
 
-    def Fit(self):
+    def Fit(self, plot=True):
         """
         Fits self.model and plots loss history over train and test sets.
         """
@@ -192,12 +192,13 @@ class AVERT_LSTM():
         print('...Training Done!')
 
         #plot history
-        plt.plot(history.history['loss'], label='train')
-        plt.plot(history.history['val_loss'], label='test')
-        plt.xlabel('epoch')
-        plt.ylabel('loss [MAE]')
-        plt.legend()
-        plt.show()
+        if plot:
+            plt.plot(history.history['loss'], label='train')
+            plt.plot(history.history['val_loss'], label='test')
+            plt.xlabel('epoch')
+            plt.ylabel('loss [MAE]')
+            plt.legend()
+            plt.show()
 
     def Predict(self):
         """
