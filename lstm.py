@@ -209,6 +209,7 @@ class AVERT_LSTM():
 
         # keep last future step
         Yhat_last = Yhat[:, -1, :]
+        self.Yhat = Yhat
 
         index = self.test_index
         columns = self.df_y.columns
@@ -243,7 +244,6 @@ class AVERT_LSTM():
 
             rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
             print("Test RMSE: %.3f" % rmse)
-
 
     def Forecast(self):
         """
