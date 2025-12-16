@@ -107,25 +107,9 @@ class AVERT_LSTM():
         self.x_scaler = x_scaler
         self.y_scaler = y_scaler
         self.train_X, self.train_Y = train_X, train_Y
-        self.test_X, self.test_Y  = test_X,  test_Y
+        self.test_X, self.test_Y = test_X,  test_Y
 
-        #calling normalized and scaled data
-        # x_data = self.x_data
-        # y_data = self.y_data
-        # nx_features = x_data.shape[1]
-        # ny_features = y_data.shape[1]
-        # self.nx_features = nx_features
-        # self.ny_features = ny_features
-        
-        # # reframe as learning problem
-        # X, _ = self.PrepareData(x_data, n_past, n_future)
-        # _, Y = self.PrepareData(y_data, n_past, n_future)
-        # n_times = X.shape[0]
-        # n_divide = round((n_times)*n_divide)
-        # train_X, train_Y = X[:n_divide], Y[:n_divide]
-        # test_X, test_Y = X[n_divide:], Y[n_divide:]
-
-        # # keep track of Datetime index across train/test set
+        # keep track of Datetime index across train/test set
         offset = n_past + n_future - 1
         valid_index = self.index[offset:offset + n_times]
 
@@ -191,7 +175,7 @@ class AVERT_LSTM():
 
         # fit network
         print('Performing Training...')
-        history = model.fit(train_X, train_Y, epochs=n_epochs, batch_size=2**6, validation_data=(test_X, test_Y), verbose=2, shuffle=False)
+        history = model.fit(train_X, train_Y, epochs=n_epochs, batch_size=2**5, validation_data=(test_X, test_Y), verbose=2, shuffle=False)
         print('...Training Done!')
 
         #plot history
@@ -232,6 +216,8 @@ class AVERT_LSTM():
         """
         model = self.model
         X = self.test_X
+
+        # scaled 
         Yhat = model.predict(X)
 
         # keep last future step
@@ -270,7 +256,17 @@ class AVERT_LSTM():
 
             rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
             print("Test RMSE: %.3f" % rmse)
+            # Ytrue_last_scaled = self.test_Y[:, -1, :]
 
+            # # inverse-transform both (need 2D for scaler)
+            # Yhat_last_unscaled  = self.y_scaler.inverse_transform(Yhat_last)
+            # Ytrue_last_unscaled = self.y_scaler.inverse_transform(Ytrue_last_scaled)
+
+            # rmse_last = np.sqrt(np.mean((Yhat_last_unscaled - Ytrue_last_unscaled)**2))
+            # mae_last = np.mean(np.abs(Yhat_last_unscaled - Ytrue_last_unscaled))
+
+            # print("Last-step UNscaled RMSE:", rmse_last)
+            # print("Last-step UNscaled MAE:", mae_last)
 
     def Forecast(self):
         """
@@ -281,12 +277,13 @@ class AVERT_LSTM():
 
     ### Helper Functions ###
 
-    def PlotData(self, dfs=None, log_vars=['VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM']):
+    def PlotData(self, dfs=None, labels=None, log_vars=['VPCC_RSAM', 'VPPC_RSAM', 'VPNC_RSAM', 'VPRS_RSAM'], figsave='lstm_pred'):
         """
         Plots data for each DataFrame in dfs:
 
         args:
             - dfs:              (list) DataFrame objects to plot. Each DataFrame must have matching columns
+            - labels:  list of strings for legend (e.g. ["Observed", "Predicted"])
             - log_vars:         (list) names of columns to plot in log scale
         """
 
@@ -295,6 +292,9 @@ class AVERT_LSTM():
         if isinstance(dfs, pd.DataFrame):
             dfs = [dfs]
 
+        if labels is None:
+            labels = [f"Series {i}" for i in range(len(dfs))]
+            
         columns = dfs[0].columns
         ncols = len(columns)
         scale = 3
@@ -315,13 +315,16 @@ class AVERT_LSTM():
             )
             ax = ax.flatten()
 
-        for df in dfs:
+        for df, label in zip(dfs, labels):
             for ii, c in enumerate(columns):
-                df[c].plot(ax=ax[ii])
+                df[c].plot(ax=ax[ii], label=label)
                 ax[ii].set_ylabel(c)
                 if c in log_vars:
                     ax[ii].set_yscale("log")
 
+        ax[0].legend(frameon=False)
+
+        plt.savefig(figsave+'.pdf')
         plt.show()
 
 
