@@ -15,3 +15,6 @@ data/VPPC_LFN_D_merged.mseed
 data/VPPC_LFZ_D_merged.mseed
 data/lake_pixel_frac_6hourly.csv
 processed_data/dataInterpolated.csv
+notebooks/test_unsupervised.py
+notebooks/lstm_sarah_singleparam.py
+notebooks/regression_experiment_results_multiparameter_rescaled.pkl

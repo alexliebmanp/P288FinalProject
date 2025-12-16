@@ -8,20 +8,16 @@ import requests
 
 BASE_URL = "https://avert-legacy.ldeo.columbia.edu/archive/miniseed"
 NETWORK  = "OV"
-# STATIONS = ["VPPC", "VPNC"]
-STATIONS = ["VPCC", "VPRS"]
+STATIONS = ["VPPC", "VPNC", "VPCC", "VPRS"]
 CHANNEL_DIR = "HHZ.D"   # directory + chunk in filename
 LOCATION = ""           # empty → two dots in filename
 
 # local root where you want the data
 OUT_ROOT = Path("Seismic/OV")
 
-# date range you care about
-# START_DATE = date(2024, 1, 1)
-# END_DATE   = date(2024, 12, 31)   # inclusive
-
+# date range of interest
 START_DATE = date(2024, 1, 1)
-END_DATE   = date(2025, 12, 31)   # inclusive
+END_DATE   = date(2025, 12, 31) # inclusive
 
 def build_url(year: int, jday: int, station: str) -> str:
     """
