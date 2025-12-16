@@ -31,10 +31,10 @@ class AVERT_LSTM():
             - input_vars:       (list) names of columns in df to use as input to LSTM
             - predict_vars:     (list) names of columns in df to predict using LSTM.
         """
-
+        # filter data to columns we want in LSTM and handle any nans
         df = df.copy()
-        df.index = pd.to_datetime(df.index)
-        df = df.fillna(0)
+        df.index = pd.to_datetime(df.index) # make sure index is datatime
+        df = df.fillna(0, inplace=True)
 
         self.df_x = df[input_vars].copy()
         self.df_y = df[predict_vars].copy()
@@ -219,6 +219,7 @@ class AVERT_LSTM():
 
         # scaled 
         Yhat = model.predict(X)
+        self.Yhat = Yhat
 
         # keep last future step
         Yhat_last = Yhat[:, -1, :]
@@ -256,17 +257,6 @@ class AVERT_LSTM():
 
             rmse = np.sqrt(np.mean((Yhat - self.test_Y) ** 2))
             print("Test RMSE: %.3f" % rmse)
-            # Ytrue_last_scaled = self.test_Y[:, -1, :]
-
-            # # inverse-transform both (need 2D for scaler)
-            # Yhat_last_unscaled  = self.y_scaler.inverse_transform(Yhat_last)
-            # Ytrue_last_unscaled = self.y_scaler.inverse_transform(Ytrue_last_scaled)
-
-            # rmse_last = np.sqrt(np.mean((Yhat_last_unscaled - Ytrue_last_unscaled)**2))
-            # mae_last = np.mean(np.abs(Yhat_last_unscaled - Ytrue_last_unscaled))
-
-            # print("Last-step UNscaled RMSE:", rmse_last)
-            # print("Last-step UNscaled MAE:", mae_last)
 
     def Forecast(self):
         """
